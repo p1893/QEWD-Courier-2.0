@@ -1,8 +1,0 @@
-{
-  "managementPassword": "pwd_conductor",
-  "serverName": "PHR Conductor MicroService Server",
-  "port": 8080,
-  "poolSize": 4,
-  "cors": true,
-  "initialSessionTimeout": 600
-}

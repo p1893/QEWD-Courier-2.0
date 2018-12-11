@@ -1,5 +1,0 @@
-{
-  "authentication_service": "=> getUri(phr.microservices.authentication)",
-  "cdr_openehr_service": "=> getUri(phr.microservices.openehr)",
-  "cdr_discovery_service": "=> getUri(phr.microservices.discovery)"
-}

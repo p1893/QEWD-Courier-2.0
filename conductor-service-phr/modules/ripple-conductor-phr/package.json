@@ -1,7 +1,0 @@
-{
-  "name": "ripple-conductor-phr",
-  "version": "1.2.0",
-  "dependencies": {
-    "qewd-router": ""
-  }
-}

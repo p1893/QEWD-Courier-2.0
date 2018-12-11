@@ -8,36 +8,27 @@ Email: <code.custodian@ripple.foundation>
 
 Author: Rob Tweed, M/Gateway Developments Ltd (@rtweed)
 
-# Docker / MicroService-based Ripple QEWD middleware
+# QEWD-Courier
 
-## Summary of the Helm Architecture
+## Summary of the QEWD-Courier Architecture
 
-The Helm middle-tier environment consists of 5 MicroServices, each of which is a Dockerised instance of
+The QEWD-Courier middle-tier environment consists of a series of MicroServices, each of which is a Dockerised instance of
 [QEWD.js](https://qewdjs.com) that is customised to perform a specific task.  
 
-The Helm middle-tier implements the REST APIs that are used by the Helm User Interface (UI) that is known as [PulseTile](https://github.com/PulseTile)
+QEWD-Courier implements the REST APIs that are used by an application's User Interface (UI) and invokes the services responsible for resolving those requests.
 
 The MicroServices are as follows:
 
-- *conductor* (folder *~/helm/conductor-service-phr*).  All incoming REST requests are channelled through this MicroService.  This MicroService does very little other than act as a router for incoming requests, forwarding them to the other MicroServices that handle them, and returning the responses from those MicroServices back to the user.  Some requests and responses are transformed, but most pass through the *conductor* MicroService unchanged.
+- *conductor* (folder *~/QEWD-Courier/courier-conductor-service*).  All incoming REST requests are channelled through this MicroService.  This MicroService does very little other than act as a router for incoming requests, forwarding them to the other MicroServices that handle them, and returning the responses from those MicroServices back to the user.  Some requests and responses are transformed, but most pass through the *conductor* MicroService unchanged.
 
-- *authentication* (folder *~/helm/authentication-service-phr*).  This MicroService provides the interface to the authentication server, typically an OpenId Connect-based server.  In production systems, it is expected that this role will be provided by NHS Digital's Citizen Id service.  However, for testing and demonstration systems, it is recommended that you use the *openid_connect* MicroService that is included in this repository.
-
-- *openid_connect* (also referred to as *oidc*) (folder *~/helm/openid-connect-server*).  This MicroService provides an OpenId Connect authentication service (based on the OpenId-certified [node-oidc-provider](https://github.com/panva/node-oidc-provider) module, integrated within a Dockerised instance of QEWD.js).  This MicroService has been designed to emulate the behaviour of NHS Digital's Citizen Id authentication service, allowing secure identity management by NHS Number.
-
-- *openehr* (folder *~/helm/cdr-service-openehr*).  This MicroService provides the interface to the OpenEHR server that you will use for maintaining clinical information for registered users.  We suggest you use the Open Source [EtherCIS](https://github.com/ethercis) OpenEHR platform, but any platform that conforms to the OpenEHR specification can also be used.
-
-- *discovery* (folder *~/helm/cdr-service-discovery*).  This MicroService provides the interface to the patient data repository provided by [Discovery Data Service](http://www.discoverydataservice.org).  In a production system, you will use the live HSCN-based version (ie available only to NHS sites).  For testing and demonstration, you should register for a subscription to their public-facing test/demonstration service.
-
-
-The repository also includes the setup and configuration required for an [NGINX](https://www.nginx.com/) front-end to the MicroServices (folder *~/helm/DMZ*)
-
+- *hello-world* (folder *~/QEWD-Courier/hello-world-service*).  A sample MicroService that accepts some simple REST requests
+and returns an appropriate response.
 
 ## Installation
 
-Clone this repo into a folder named ~/helm on your host system, eg:
+Clone this repo into a folder named ~/QEWD-Courier on your host system, eg:
 
-       git clone https://github.com/RippleOSI/Ripple-QEWD-Microservices ~/helm
+       git clone https://github.com/RippleOSI/QEWD-Courier ~/QEWD-Courier
 
 
 ## Install Docker
@@ -75,113 +66,38 @@ You'll be prompted for your password when invoking the second command above
 
 These are defined in the file:
 
-      ~/helm/settings/configuration.json
+      ~/QEWD-Courier/global_settings/configuration.json
 
-This file is read and used by all the Helm MicroServices when they start up.
+This file is read and used by all the QEWD-Courier MicroServices when they start up.
 
 It is recommended that you don't change the suggested ports unless you need to, in which case you'll need to make corresponding changes to the commands that start each MicroService.
 
-Note 1: The *conductor* and *openid_connect* services are externally-facing and should be accessed via SSL
+Note 1: The *conductor* service is externally-facing and should be accessed via SSL
 
 Note 2: External access will be proxied via nginx (see later)
 
-Note 3: On cloud machines, the *authentication*, *openehr* and *discovery* services often require use of an IP address that is local to the subnet on which it resides: these addresses are the ones that the *conductor* service uses to connect to them.  However, the *conductor* and *openId_connect* host names should be the appropriate externally-facing IP address or domain name by which the PulseTile UI can connect to them.
+Note 3: On cloud machines, the *hello-world*, and your application's services make use of a bridged Docker network to communicate internally.  However, the *courier-conductor-service* host name should be the appropriate externally-facing IP address or domain name by which your UI can connect to it.
 
 
 Example on a local VM:
 
-      "phr": {
         "microservices": {
           "conductor": {
-            "host": "https://192.168.1.67",
+            "host": "https://127.0.0.1",
             "port": 443
           },
-          "authentication": {
-            "host": "http://192.168.1.67",
+          "hello-world": {
+            "host": "http://hello-world",
             "port": 8001
-          },
-          "openehr": {
-            "host": "http://192.168.1.67",
-            "port": 8003
-          },
-          "discovery": {
-            "host": "http://192.168.1.67",
-            "port": 8004
-          },
-          "openid_connect": {
-            "host": "https://192.168.1.67",
-            "port": 443,
-            "path_prefix": "/oidc"
-          }
         }
-      }
 
-### 2. Two Factor Authentication
-
-By default, the Helm repository has Two Factor Authentication disabled.  To enable it, edit the configuration file:
-
-      ~/helm/settings/configuration.json
-
-and look for this property:
-
-      use2FA: false,
-
-Either remove this line or set its value to *true*, and re-save the configuration file.
-
-
-### 3. Configure Twilio
-
-*If Two Factor Authentication is disabled, you can ignore this section.*
-
-[Twilio](https://www.twilio.com/) is used by the Helm middle-tier for Two-Factor authentication via Mobile Phone text messaging.  It is mainly used in the *openid_connect* MicroService, but any management utilities provided in the other MicroServices also rely on this service to ensure that their use is secure.
-
-Therefore, to use the Helm middle tier you will need to register with Twilio for an account that allows you to send text messages to your users' mobile phones.
-
-Your Twilio registration credentials must be added to the file:
-
-      ~/helm/settings/configuration.json
-
-ie replace the values in this section:
-
-     "twilio": {
-       "accountSid": "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
-       "authToken": "yyyyyyyyyyyyyyyyyyyyyyyyyy",
-       "telNo": "+447449000000"
-     }
-
-
-### 4. Configure your Mail Server
-
-*If Two Factor Authentication is disabled, you can ignore this section.*
-
-An email server is required for sending user authorisation/validation emails at user sign-up time
-
-At the Ripple Foundation we use [MailGun](https://www.mailgun.com/), but there are other options available.
-
-The Dockerised QEWD.js-based MicroServices make use of the widely-used Node.js [NodeMailer](https://nodemailer.com) module for sending emails.  The NodeMailer-compatible properties for your email service must be entered into the email_server property in 
-
-      ~/helm/settings/configuration.json
-
-ie replace the values in this section as appropriate:
-
-     "email_server": {
-       "host": "smtp.eu.mailgun.org",
-       "port": 465,
-       "secure": true,
-       "auth": {
-         "user": "postmaster@mail.example.com",
-         "pass": "xxxxxxxxxxxxxxxxxxxxxxxxxxx"
-       }
-     }
-
-
-### 5. Change the shared JSON Web Token Secret
+### 2. Change the shared JSON Web Token Secret
 
 It is strongly recommended that you change the shared JSON Web Token (JWT) secret that is used by the Helm MicroServices for authenticating and signing the JWTs that flow between PulseTile and the Helm MicroServices.
 
 The JWT Secret is defined in:
 
-      ~/helm/settings/configuration.json
+      ~/QEWD-Courier/global_settings/configuration.json
 
 ie replace the value of the *secret* property in this section:
 
@@ -201,47 +117,10 @@ The *managementPassword* is used to access the QEWD-Monitor application for each
 Change this value before you start up the MicroService.  If you want to change it thereafter, you must restart the MicroService for it to take effect.
 
 
-### 7. Configure your OpenEHR Server
-
-The *openehr* MicroService provides the interface to your OpenEHR server.  The configuration for this is specified in the file:
-
-      ~/helm/cdr-service-openehr/useDefined.json
-
-It's pre-set to share use of an existing cloud-based test EtherCIS system:
-
-    "openehr": {
-      "ethercis": {
-        "url": "http://46.101.81.30:8080",
-        "username": "guest",
-        "password": "guest",
-        "platform": "ethercis"
-      }
-    }
-
-but you can change these settings to use your own OpenEHR server.
-
-
-### 7. Configure access to Discovery Data Service
-
-You'll need to get a trial / demo account with Discovery Data Service.  Enter your username & password into the fields in the Discovery MicroService configuration file:
-
-      ~/helm/cdr-service-discovery/modules/ripple-cdr-discovery/src/hosts.js
-
-ie modify the *username* and *password* values in this section:
-
-      auth: {
-        host:       'https://devauth.endeavourhealth.net',
-        path:       '/auth/realms/endeavour/protocol/openid-connect/token',
-        username:   'xxxxxxx',
-        password:   'yyyyyyyyyyyyyyy',
-        client_id:  'eds-data-checker',
-        grant_type: 'password'
-      }
-
 
 ## Install and Configure NGINX
 
-NGINX acts as the main web server for Helm, and proxies access to the QEWD MicroServices.
+NGINX acts as the main web server for QEWD-COurier, and proxies access to the QEWD MicroServices.
 
 ### Installing NGINX
 
@@ -265,7 +144,7 @@ Configure NGINX for use with Helm by replacing this file on your machine:
 
 with the file that you'll find at:
 
-      ~/helm/DMZ/etc/nginx/nginx.conf
+      ~/QEWD-Courier/DMZ/etc/nginx/nginx.conf
 
 
 Then add or replace the contents of the file:
@@ -274,7 +153,7 @@ Then add or replace the contents of the file:
 
 with the file that you'll find at:
 
-      ~/helm/DMZ/etc/nginx/conf.d
+      ~/QEWD-Courier/DMZ/etc/nginx/conf.d
 
 There's just one file in that folder:  *default.conf* 
 
@@ -297,17 +176,17 @@ to
 
 ### Copy the Self-Signed certificates:
 
-In order to access Helm over SSL (HTTPS), you will need the appropriate certificates.  One a test/demonstration system you can create your own Self-Signed versions: there are lots of instructions on the Internet on how to do this for NGINX.  
+In order to access QEWD-Courier over SSL (HTTPS), you will need the appropriate certificates.  One a test/demonstration system you can create your own Self-Signed versions: there are lots of instructions on the Internet on how to do this for NGINX.  
 
 However, if you wish, you can make use of the Self-Signed certificates that are included in the repository. If you're happy that these will be satisfactory and adequate for your needs (bearing in mind the lack of inherent security that they will provide), then follow these steps:
 
 If your system doesn't already have the folder /etc/pki, create it copy in the contents of the folder:
 
-       ~/helm/DMZ/etc/pki
+       ~/QEWD-Courier/DMZ/etc/pki
 
 Or, if */etc/pki* already exists, copy the files from: 
 
-       ~/helm/DMZ/etc/pki
+       ~/QEWD-Courier/DMZ/etc/pki
 
 to corresponding sub-folders
 
@@ -315,11 +194,6 @@ To take effect you must restart nginx:
 
       sudo systemctl restart nginx
 
-
-
-Copy the PulseTile UI files to the nginx Web Server root directory:
-
- ~/usr/share/nginx/html
 
 
 ## Running the Suite of QEWD Courier MicroServices
@@ -332,7 +206,7 @@ You **MUST** be using the latest version!  To update it:
 
 To start the Helm MicroServices, either run:
 
-      source ~/helm/start.sh
+      source ~/QEWD-Courier/start.sh
 
 or open the script file and invoke the commands within it manually, one by one.
 
@@ -347,114 +221,28 @@ To view the log of each one
 where {container-name} is one of:
 
 - conductor
-- auth
-- openehr
-- discovery
-- oidc
+- hello-world
 
-Note: when you start the first Helm MicroService for the first time, Docker will automatically download the container *rtweed/qewd-server* from the Docker Hub, which takes a couple of minutes depending on your network speed.
+Note: when you start the first QEWD-Courier MicroService for the first time, Docker will automatically download the container *rtweed/qewd-server* from the Docker Hub, which takes a couple of minutes depending on your network speed.
 
 
 Everything should now be up and running.
 
 
-## Configuring the OpenID Connect Server
+# Other Useful Information about the QEWD-Courier Middle Tier Architecture
 
-Before being able to use PulseTile, you need to configure the OpenId Connect server for use with Helm.
-
-When you first start the OpenId Connect Server, the appropriate Client and Claim for use with Helm is set up for you automatically.  All you need to do is create one or more users for your Helm service, as follows:
-
-First, start up the OIDC Admin application:
-
-      https://192.168.1.100/oidc-admin/index.html
-
-Note: change the IP address / host name to match that of the NGINX web server for your system.
-
-The first time you run this it needs you to create an initial Administrator user.  
-
-Click the *Continue* button to commence this process
-
-Then log in with the QEWD password for the *openid_connect* MicroService - unless you changed it earlier, it will be:
-
-     pwd_oidc
-
-You'll now see a form where you can enter your details as a Administrator.
-
-Note: You **must** provide a working mobile phone number, because this application uses it for Two Factor Authentication (if enabled).
-
-Once you save the Administrator details you'll be asked to log in again, using the new credentials.
-
-If Two Factor Authentication is enabled, you'll then be prompted to enter the 6 digit code that will have been sent to your mobile phone.  Enter the correct number.
-
-You'll now be presented with the main Admin Portal screen from which you can create and maintain Helm users.
-
-
-
-## Creating and Maintaining Users
-
-From within the main Admin Portal screen, click the *Users* tab  and the Green **+** button that you'll see at the far right-hand side of the *Users* banner
-
-Enter your user's details.  
-
-**Important**: if you have enabled Two Factor Authentication, ensure that both the email account and mobile phone number are working and correctly-entered.  These will be used for validating the user's account and for Two Factor Authentication respectively.
-
-Note: the Mobile phone number must be entered with the correct country code at the start, eg +44 7771 987654.  Spaces within the number are optional.
-
-After you click the Save button, you'll see the user's details in the Users table display.  
-
-
-if Two Factor Authentication is enabled, then to the far right of the display, you'll see three buttons, the first of which is an orange button with an Info triangle inside it.  Click this button to send the user an email for them to verify their email address.  The new user will receive an email asking them to verify themselves by clicking a link within the email text.  When they do this, they will be directed to the OpenId Connect server which will return them a 6 digit temporary one-time password
-
-The user can use this to log in to the Helm system.
-
-
-## Logging In To Helm
-
-The first time you log in you must use the 6-digit one-time password that you were given when you verified your details (see the previous section above).
-
-To start the Helm PulseTile User Interface, just point your browser at the root path of NGINX on your server, eg:
-
-     https://192.168.1.100
-
-
-You should be re-directed to the OpenId Connect server and you should see the login screen.  Enter your registered email address and password.
-
-Note: if Two Factor Authentication is **DISABLED**, enter the password: **password**
-
-Accept the Terms and Conditions
-
-If Two Factor Authentication is enabled, you'll be asked for the 6 digit number that will have been sent to your mobile phone
-
-if Two Factor Authentication is enabled, and if this is the first time you logged in, you now have to set your permanent password.  It must be a mixture of upper and lower case characters and one or more numbers.
-
-After a short delay, you’ll now see the main Helm screen come up with data for your NHS Number.  That data will have been mapped from test data on the Discovery Data Service.
-
-
-
-
-# Other Useful Information about the Helm Middle Tier Architecture
-
-## What is the ~/helm/yottadb Folder For?
+## What is the ~/QEWD-Courier/yottadb Folder For?
 
 Each MicroService is run as a Docker Container - this container uses the *qewd-server* Docker service which
 includes not only an instance of QEWD, but also an instance of the [YottaDB](https://yottadb.com/) NoSQL database which is mainly
 used for QEWD internal management and user Session management.  However, it is also used as a database for
-the *authentication* and *openehr* and *openid_connect* MicroServices.  In order for such data to persist beyond the life-span of the 
-Docker containers, the YottaDB database files are mapped to pre-initialised files in the *~/helm/yottadb* directory.
+other MicroServices.  In order for such data to persist beyond the life-span of the 
+Docker containers, the YottaDB database files are mapped to pre-initialised files in the *~/QEWD-Courier/yottadb* directory.
 
 **Please do not** touch or change the files in this directory and its sub-directories.
 
 
-## The OpenEHR Jumper Functionality
-
-OpenEHR Jumper automates the fetching and updating of OpenEHR data, avoiding the need for hand-crafted
-AQL and Flat JSON definitions.  Instead, OpenEHR Jumper just needs to know the name of each
-OpenEHR Template that you're interested in using.
-
-The OpenEHR Jumper configuration is already set up for you in the *openehr* MicroService.
-
-
-## Stopping and Restarting the Helm MicroServices
+## Stopping and Restarting the QEWD-Courier MicroServices
 
 You can use a variety of mechanisms for stopping the Ripple-QEWD MicroServices, for example:
 
@@ -477,18 +265,15 @@ To re-start each MicroService, see the section **Running the Suite of MicroServi
 
 ## The QEWD Monitor Application
 
-Each Ripple-QEWD MicroService runs as a self-contained QEWD instance, and includes its own copy
+Each QEWD-Courier MicroService runs as a self-contained QEWD instance, and includes its own copy
 of the QEWD Monitor application.
 
 This is a browser-based application that is started using the URL path */{proxy-path}/qewd-monitor/index.html*
 
 where {proxy_path} is an NGINX-interpreted path that routes the request to the appropriate MicroService.  These paths are as follows:
 
-- **conductor**:      */qewd_conductor/*
-- **authentication**: */qewd_auth/*
-- **openid_connect**: */oidc/*
-- **openehr**:        */qewd_openehr/*
-- **discovery**:      */qewd_discovery/*
+- **conductor**:      */courier_conductor/*
+- **hello-world**:    */helloworld/*
 
 
 For example, to access the QEWD Monitor application for the *conductor* service, point your browser at:
@@ -518,10 +303,7 @@ It is sometimes useful, for system management reasons, to be able to gain shell 
 where {container-name} is one of:
 
 - conductor
-- auth
-- openehr
-- discovery
-- oidc
+- hello-world
 
 Once you have shell access, you can open the YottaDB interactive shell to view / maintain its Global Storage.  From the Container's intenal /opt/qewd folder, simply invoke the command:
 

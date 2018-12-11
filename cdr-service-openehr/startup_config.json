@@ -1,7 +1,0 @@
-{
-  "managementPassword": "pwd_openehr",
-  "serverName": "OpenEHR Access MicroService Server",
-  "port": 8080,
-  "poolSize": 3,
-  "initialSessionTimeout": 600
-}

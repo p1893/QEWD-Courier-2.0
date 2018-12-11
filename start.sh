@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 
-sudo docker run -d --rm --name conductor -p 8000:8080 -v ~/helm/conductor-service-phr:/opt/qewd/mapped -v ~/helm/conductor-service-phr/www:/opt/qewd/www -v ~/helm/settings:/opt/qewd/mapped/settings -v ~/helm/yottadb/conductor:/root/.yottadb/r1.22_x86_64/g rtweed/qewd-server
+# Create bridged network for internal container connections
+sudo docker network create --driver bridge QEWD-Courier-Network
 
-sudo docker run -d --rm --name auth -p 8001:8080 -v ~/helm/authentication-service-phr:/opt/qewd/mapped -v ~/helm/authentication-service-phr/www:/opt/qewd/www -v ~/helm/yottadb/authentication:/root/.yottadb/r1.22_x86_64/g -v ~/helm/settings:/opt/qewd/mapped/settings rtweed/qewd-server
+sudo docker run --network QEWD-Courier-Network --rm --name conductor -p 8000:8080 -v ~/QEWD-Courier/courier-conductor-service:/opt/qewd/mapped -v ~/QEWD-Courier/courier-conductor-service/www:/opt/qewd/www -v ~/QEWD-Courier/global_settings:/opt/qewd/mapped/global_settings -v ~/QEWD-Courier/courier-conductor-service/db/yottadb:/root/.yottadb/r1.22_x86_64/g -dit rtweed/qewd-server
 
-sudo docker run -d --rm --name openehr -p 8003:8080 -v ~/helm/cdr-service-openehr:/opt/qewd/mapped -v ~/helm/cdr-service-openehr/www:/opt/qewd/www -v ~/helm/yottadb/openehr:/root/.yottadb/r1.22_x86_64/g -v ~/helm/settings:/opt/qewd/mapped/settings rtweed/qewd-server
+# HelloWorld sample service
+sudo docker run --network QEWD-Courier-Network --rm --name hello-world -p 8001:8080 -v ~/QEWD-Courier/hello-world-service:/opt/qewd/mapped -v ~/QEWD-Courier/hello-world-service/www:/opt/qewd/www -v ~/QEWD-Courier/global_settings:/opt/qewd/mapped/global_settings -v ~/QEWD-Courier/courier-conductor-service/db/yottadb:/root/.yottadb/r1.22_x86_64/g -dit rtweed/qewd-server
 
-sudo docker run -d --rm --name discovery -p 8004:8080 -v ~/helm/cdr-service-discovery:/opt/qewd/mapped -v ~/helm/cdr-service-discovery/www:/opt/qewd/www -v ~/helm/yottadb/discovery:/root/.yottadb/r1.22_x86_64/g -v ~/helm/settings:/opt/qewd/mapped/settings rtweed/qewd-server
+# Authentication and OpenID Connect services, if you want them
+#sudo docker run --network QEWD-CourierNetwork --rm --name auth -p 8001:8080 -v ~/QEWD-Courier/authentication-service-phr:/opt/qewd/mapped -v ~/QEWD-Courier/authentication-service-phr/www:/opt/qewd/www -v ~/QEWD-Courier/yottadb/authentication:/root/.yottadb/r1.22_x86_64/g -v ~/QEWD-Courier/settings:/opt/qewd/mapped/settings -dit rtweed/qewd-server
+#sudo docker run --network QEWD-CourierNetwork --rm --name oidc -p 8080:8080 -v ~/QEWD-Courier/openid-connect-server:/opt/qewd/mapped -v ~/QEWD-Courier/openid-connect-server/www:/opt/qewd/www -v ~/QEWD-Courier/settings:/opt/qewd/mapped/settings -v ~/QEWD-Courier/yottadb/openid-connect-server:/root/.yottadb/r1.22_x86_64/g -dit rtweed/qewd-server 
 
-sudo docker run -d --rm --name oidc -p 8080:8080 -v ~/helm/openid-connect-server:/opt/qewd/mapped -v ~/helm/openid-connect-server/www:/opt/qewd/www -v ~/helm/settings:/opt/qewd/mapped/settings -v ~/helm/yottadb/openid-connect-server:/root/.yottadb/r1.22_x86_64/g rtweed/qewd-server 
+
+# Smoke test
+sleep 5
+curl http://127.0.0.1:8000/api/smokeTest
+curl http://127.0.0.1/api/smokeTest
+curl http://127.0.0.1/api/helloworld
